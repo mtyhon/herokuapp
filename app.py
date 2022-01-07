@@ -67,6 +67,8 @@ freqs = frequencies.Frequencies(frequency=pds_l023_removed.frequency.values,
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+server = app.server
+app.title='PSxPS'
 
 df_comb = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/samples/%d_psps.csv' %kicx))
 
@@ -326,4 +328,4 @@ def update_psxps(hoverData, clickData, inp_fig, local_fig, global_clickdata):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server()
