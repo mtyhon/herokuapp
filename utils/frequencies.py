@@ -6,7 +6,6 @@ import utils.scaling_relations as scalings
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import yaml
 
 class Frequencies(object):
 
