@@ -88,10 +88,10 @@ app.layout = html.Div([
     
     
     html.Div([
-        dcc.Graph(
+        dcc.Graph(#figure=fig,
             id='turbo_samples',
-            hoverData={'points': [{'x': df_comb.DPi1.values[len(df_comb[df_comb.sample_type == 'BayesOpt'])//2],
-                                  'y': df_comb.q.values[len(df_comb[df_comb.sample_type == 'BayesOpt'])//2] }]}
+            hoverData={'points': [{'x': df_comb.DPi1.values[len(df_comb)//2],
+                                  'y': df_comb.q.values[len(df_comb)//2] }]}
         )
     ], style={'width': '49%', 'display': 'inline-block', 'padding': '0 20'}),
     
@@ -144,17 +144,17 @@ def format_psps(period, PSD_LS, dpi, q, click_period, click_power, tracecolor, c
     
     if not local:
         xrange= [20, 150]
-        titletext="PSxPS Global"
+        titletext="Global"
         topm = 40
         xtitle=0.87
         xannot = 0.74
     else:
         xrange= [min(df_comb.DPi1), max(df_comb.DPi1)]
-        titletext="PSxPS Local"
+        titletext="Local"
         topm = 40  
         xtitle=0.853
         xannot= 0.732
-    
+
     if len(click_period) == 0:
         data_ = [dict(
             x=period,
@@ -167,7 +167,7 @@ def format_psps(period, PSD_LS, dpi, q, click_period, click_power, tracecolor, c
             '<b>DPi1</b>: %{x:.1f}s'+
             '<br><b>Power</b>: %{y:.4f}<extra></extra>', #<extra></extra> removes the 'Trace 0' in the hover
         )]
-        
+       
     else:
         data_ = [dict(
             x=period,
@@ -203,16 +203,12 @@ def format_psps(period, PSD_LS, dpi, q, click_period, click_power, tracecolor, c
         'data': data_,
         
         'layout': {
-            'annotations': [{'x': xannot, 'y': 0.75, 'xanchor': 'left', 'yanchor': 'bottom',
+            'annotations': [{'x': 0.7, 'y': 0.75, 'xanchor': 'left', 'yanchor': 'bottom',
                 'xref': 'paper', 'yref': 'paper', 'showarrow': False,
                 'align': 'left', 'bgcolor': 'rgba(255, 255, 255, 0.5)',
-                'text': 'Period Spacing: %.1f s<br>Coupling Factor: %.2f' %(dpi, q)
+                'text': 'PSxPS %s<br>Period Spacing: %.1fs<br>Coupling Factor: %.2f' %(titletext, dpi, q)
             }],
-            'title': {"text": titletext,
-                     "font": {"color": "k"},
-                    "y": 0.85,
-                     "x": xtitle
-                     },
+
             'yaxis': {'type': 'linear',
                      "title": {'text': "Power", 'standoff': 1},
                      "range": [0, 0.006]},
@@ -232,9 +228,7 @@ def format_psps(period, PSD_LS, dpi, q, click_period, click_power, tracecolor, c
                  'y0': 0,
                  'y1': 0.006,
                  'yref': 'y'}],
-            
-          
-            
+                     
         }
 
     }
@@ -258,8 +252,8 @@ def format_scatter(df):
         '<b>DPi1</b>: %{x:.1f}s'+
         '<br><b>q</b>: %{y:.3f}<br>')
 
-    fig.update_xaxes(title_standoff=1, range=[min(df_comb.DPi1), max(df_comb.DPi1)], gridcolor='gainsboro') # Standoff is padding
-    fig.update_yaxes(title_standoff=1, range=[min(df_comb.q), max(df_comb.q)], gridcolor='gainsboro') # Standoff is padding
+    fig.update_xaxes(title_standoff=1, range=[min(df.DPi1), max(df.DPi1)], gridcolor='gainsboro') # Standoff is padding
+    fig.update_yaxes(title_standoff=1, range=[min(df.q), max(df.q)], gridcolor='gainsboro') # Standoff is padding
     fig.update_coloraxes(showscale=False)
 
     return fig
@@ -271,60 +265,48 @@ def format_scatter(df):
 def update_scatter(samplename):
     inp_df = df_comb[df_comb.sample_type == samplename]
     return format_scatter(inp_df) 
-    
+
 
 @app.callback(
     [dash.dependencies.Output('global_psps', 'figure'), dash.dependencies.Output('local_psps', 'figure')],
-    [dash.dependencies.Input('turbo_samples', 'hoverData'), dash.dependencies.Input('turbo_samples', 'clickData'),
+    [dash.dependencies.Input('turbo_samples', 'clickData'),
      dash.dependencies.Input('turbo_samples', 'figure'), dash.dependencies.Input('local_psps', 'figure'),
     dash.dependencies.Input('global_psps', 'clickData')])
-def update_psxps(hoverData, clickData, inp_fig, local_fig, global_clickdata):
-    dpi_value = hoverData['points'][0]['x']
-    q_value = hoverData['points'][0]['y']
+def update_psxps(clickData, inp_fig, local_fig, global_clickdata):
+    try:
+        dpi_value = clickData['points'][0]['x']
+        q_value = clickData['points'][0]['y']
+    except:
+        dpi_value =  df_comb.DPi1.values[len(df_comb)//2]
+        q_value = df_comb.q.values[len(df_comb)//2]
+
     colorlist = inp_fig['data'][0]['marker']['color'] # loss values
 
     try:
-        markercol =  hoverData['points'][0]['marker.color']
+        
+        markercol =  clickData['points'][0]['marker.color']
         _c = (markercol - np.min(colorlist)) / (np.max(colorlist) - np.min(colorlist))
         tracecolor = sample_colorscale(inp_fig['layout']['coloraxis']['colorscale'],
                                        [_c], low=0.0, high=1.0, colortype='rgb')[0]
+
     except:
         tracecolor = 'gray'
         
-    
     period, PSD_LS = create_psps(dpi_value, q_value)
-    if clickData is not None:
-        if ('click_dpi' not in globals()) and ('global_click_dpi' not in globals()) : # initial (len(local_fig['data']) == 1) and 
-            global click_period, click_power, click_dpi, click_q, click_tracecolor
-            click_period, click_power = deepcopy(period), deepcopy(PSD_LS)
-            click_dpi, click_q = deepcopy(clickData['points'][0]['x']), deepcopy(clickData['points'][0]['y'])
-            click_tracecolor = deepcopy(tracecolor)
-        elif clickData['points'][0]['x'] != click_dpi:
-            click_period, click_power = deepcopy(period), deepcopy(PSD_LS)
-            click_dpi, click_q = deepcopy(clickData['points'][0]['x']), deepcopy(clickData['points'][0]['y']) 
-            click_tracecolor = deepcopy(tracecolor)
-        else:
-            pass
-    
- 
-    else:
+
+    global click_period, click_power, click_tracecolor
+    if clickData is None:
         click_period, click_power, click_tracecolor = [], [], None
-        
-        
-    if global_clickdata is not None: # conditions for Reset
-        if 'global_click_dpi' not in globals(): # so make it a global!
-            global global_click_dpi
-            global_click_dpi = deepcopy(global_clickdata['points'][0]['x'])
-            click_period, click_power, click_tracecolor = [], [], None
-        elif global_clickdata['points'][0]['x'] != global_click_dpi: # we made a new click
-            global_click_dpi = deepcopy(global_clickdata['points'][0]['x'])
-            click_period, click_power, click_tracecolor = [], [], None
-        else: # the same global click dpi is preserved
-            pass
-        
-    return format_psps(period, PSD_LS,dpi_value, q_value, click_period, click_power,
-                       tracecolor,click_tracecolor), format_psps(period, PSD_LS, dpi_value, q_value,
+    
+    forz1 = format_psps(period, PSD_LS,dpi_value, q_value, click_period, click_power,
+                       tracecolor,click_tracecolor)
+    forz2 = format_psps(period, PSD_LS, dpi_value, q_value,
                                                 click_period, click_power, tracecolor, click_tracecolor, local=True)
+    
+        
+    click_period, click_power, click_tracecolor = deepcopy(period), deepcopy(PSD_LS), deepcopy(tracecolor)
+    
+    return forz1, forz2
 
 
 if __name__ == '__main__':
