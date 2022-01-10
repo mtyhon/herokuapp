@@ -66,11 +66,9 @@ freqs = frequencies.Frequencies(frequency=pds_l023_removed.frequency.values,
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-server = app.server
-app.title='PSxPS'
+app = JupyterDash(__name__, external_stylesheets=external_stylesheets)
 
-df_comb = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/samples/%d_psps.csv' %kicx))
+server = app.server
 
 app.layout = html.Div([
     
@@ -90,8 +88,8 @@ app.layout = html.Div([
     html.Div([
         dcc.Graph(#figure=fig,
             id='turbo_samples',
-            hoverData={'points': [{'x': df_comb.DPi1.values[len(df_comb)//2],
-                                  'y': df_comb.q.values[len(df_comb)//2] }]}
+            hoverData={'points': [{'x': df_comb.DPi1.values[np.argsort(df_comb.Loss.values)[len(df_comb)//2]],
+                                  'y': df_comb.q.values[np.argsort(df_comb.Loss.values)[len(df_comb)//2]] }]}
         )
     ], style={'width': '49%', 'display': 'inline-block', 'padding': '0 20'}),
     
@@ -203,10 +201,10 @@ def format_psps(period, PSD_LS, dpi, q, click_period, click_power, tracecolor, c
         'data': data_,
         
         'layout': {
-            'annotations': [{'x': 0.7, 'y': 0.75, 'xanchor': 'left', 'yanchor': 'bottom',
+            'annotations': [{'x': 0.65, 'y': 0.75, 'xanchor': 'left', 'yanchor': 'bottom',
                 'xref': 'paper', 'yref': 'paper', 'showarrow': False,
                 'align': 'left', 'bgcolor': 'rgba(255, 255, 255, 0.5)',
-                'text': 'PSxPS %s<br>Period Spacing: %.1fs<br>Coupling Factor: %.2f' %(titletext, dpi, q)
+                'text': ' PSxPS %s<br> Period Spacing: %.2fs<br> Coupling Factor: %.3f' %(titletext, dpi, q)
             }],
 
             'yaxis': {'type': 'linear',
@@ -271,41 +269,48 @@ def update_scatter(samplename):
     [dash.dependencies.Output('global_psps', 'figure'), dash.dependencies.Output('local_psps', 'figure')],
     [dash.dependencies.Input('turbo_samples', 'clickData'),
      dash.dependencies.Input('turbo_samples', 'figure'), dash.dependencies.Input('local_psps', 'figure'),
-    dash.dependencies.Input('global_psps', 'clickData')])
-def update_psxps(clickData, inp_fig, local_fig, global_clickdata):
+    dash.dependencies.Input('global_psps', 'figure'), dash.dependencies.Input('global_psps', 'clickData')])
+def update_psxps(clickData, inp_fig, local_fig, global_fig, global_clickData):
+
     try:
         dpi_value = clickData['points'][0]['x']
         q_value = clickData['points'][0]['y']
     except:
-        dpi_value =  df_comb.DPi1.values[len(df_comb)//2]
-        q_value = df_comb.q.values[len(df_comb)//2]
+        soboldf = df_comb[df_comb.sample_type == 'Sobol']
+        dpi_value =  soboldf.DPi1.values[np.argsort(soboldf.Loss.values)[len(soboldf)//2]]
+        q_value = soboldf.q.values[np.argsort(soboldf.Loss.values)[len(soboldf)//2]]
 
     colorlist = inp_fig['data'][0]['marker']['color'] # loss values
+    period, PSD_LS = create_psps(dpi_value, q_value)
 
-    try:
-        
+    try:      
         markercol =  clickData['points'][0]['marker.color']
         _c = (markercol - np.min(colorlist)) / (np.max(colorlist) - np.min(colorlist))
         tracecolor = sample_colorscale(inp_fig['layout']['coloraxis']['colorscale'],
                                        [_c], low=0.0, high=1.0, colortype='rgb')[0]
 
     except:
-        tracecolor = 'gray'
+        _c = (np.median(colorlist) - np.min(colorlist)) / (np.max(colorlist) - np.min(colorlist))
+        tracecolor = sample_colorscale(inp_fig['layout']['coloraxis']['colorscale'],
+                                       [_c], low=0.0, high=1.0, colortype='rgb')[0]
         
-    period, PSD_LS = create_psps(dpi_value, q_value)
-
-    global click_period, click_power, click_tracecolor
-    if clickData is None:
+        
+    if local_fig is not None:
+        old_dpi, old_q = float(local_fig['layout']['annotations'][0]['text'].split(' ')[5][:5]),\
+        float(local_fig['layout']['annotations'][0]['text'].split(' ')[8])
+        click_period, click_power = create_psps(old_dpi, old_q)
+        click_tracecolor = local_fig['data'][0]['line']['color']
+        
+    else:
         click_period, click_power, click_tracecolor = [], [], None
+    
     
     forz1 = format_psps(period, PSD_LS,dpi_value, q_value, click_period, click_power,
                        tracecolor,click_tracecolor)
     forz2 = format_psps(period, PSD_LS, dpi_value, q_value,
                                                 click_period, click_power, tracecolor, click_tracecolor, local=True)
     
-        
-    click_period, click_power, click_tracecolor = deepcopy(period), deepcopy(PSD_LS), deepcopy(tracecolor)
-    
+            
     return forz1, forz2
 
 
