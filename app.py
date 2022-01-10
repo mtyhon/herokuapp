@@ -65,7 +65,7 @@ freqs = frequencies.Frequencies(frequency=pds_l023_removed.frequency.values,
 
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-
+df_comb = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/samples/%d_psps.csv' %kicx))
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title ='PSxPS'
 server = app.server
